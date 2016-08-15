@@ -224,6 +224,25 @@
 }
 
 - (void)addMessage:(XHMessage *)addedMessage {
+    int64_t delayInSeconds = 0.2;
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+    dispatch_after(popTime, dispatch_get_main_queue(), ^(void) {
+        NSMutableArray *messages = [NSMutableArray arrayWithArray:self.messages];
+        [messages addObject:addedMessage];
+        
+        NSMutableArray *indexPaths = [NSMutableArray arrayWithCapacity:1];
+        [indexPaths addObject:[NSIndexPath indexPathForRow:messages.count - 1 inSection:0]];
+        self.messages = messages;
+        //            [weakSelf.messageTableView beginUpdates];
+        [self.messageTableView insertRowsAtIndexPaths:indexPaths withRowAnimation:UITableViewRowAnimationNone];
+        //            [weakSelf.messageTableView endUpdates];
+        [self.messageTableView reloadData];
+        [self scrollToBottomAnimated:YES];
+        
+        
+    });
+
+    /*
     WEAKSELF
     [self exChangeMessageDataSourceQueue:^{
         NSMutableArray *messages = [NSMutableArray arrayWithArray:weakSelf.messages];
@@ -238,6 +257,7 @@
             [weakSelf scrollToBottomAnimated:YES];
         }];
     }];
+     */
 }
 
 - (void)removeMessageAtIndexPath:(NSIndexPath *)indexPath {
@@ -254,6 +274,44 @@
 static CGPoint  delayOffset = {0.0};
 // http://stackoverflow.com/a/11602040 Keep UITableView static when inserting rows at the top
 - (void)insertOldMessages:(NSArray *)oldMessages completion:(void (^)())completion {
+    int64_t delayInSeconds = 0.2;
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+    dispatch_after(popTime, dispatch_get_main_queue(), ^(void) {
+        
+        delayOffset = self.messageTableView.contentOffset;
+        NSMutableArray *indexPaths = [[NSMutableArray alloc] initWithCapacity:oldMessages.count];
+        NSMutableIndexSet *indexSets = [[NSMutableIndexSet alloc] init];
+        [oldMessages enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:idx inSection:0];
+            [indexPaths addObject:indexPath];
+            
+            delayOffset.y += [self calculateCellHeightWithMessage:[oldMessages objectAtIndex:idx] atIndexPath:indexPath];
+            [indexSets addIndex:idx];
+        }];
+        
+        NSMutableArray *messages = [[NSMutableArray alloc] initWithArray:self.messages];
+        [messages insertObjects:oldMessages atIndexes:indexSets];
+        [UIView setAnimationsEnabled:NO];
+        self.messageTableView.userInteractionEnabled = NO;
+        //[self.messageTableView beginUpdates];
+        
+        self.messages = messages;
+        
+        [self.messageTableView insertRowsAtIndexPaths:indexPaths withRowAnimation:UITableViewRowAnimationNone];
+        //            [weakSelf.messageTableView reloadData];
+        
+        [UIView setAnimationsEnabled:YES];
+        
+        [self.messageTableView setContentOffset:delayOffset animated:NO];
+        self.messageTableView.userInteractionEnabled = YES;
+        if (completion) {
+            completion();
+        }
+        
+        
+    });
+
+    /*
     WEAKSELF
     [self exChangeMessageDataSourceQueue:^{
         delayOffset = weakSelf.messageTableView.contentOffset;
@@ -291,6 +349,7 @@ static CGPoint  delayOffset = {0.0};
             }
         }];
     }];
+     */
 }
 
 - (void)insertOldMessages:(NSArray *)oldMessages {
